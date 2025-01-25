@@ -1,7 +1,7 @@
 import json
 import folium
 
-geojson_file = "RoadCrashes_GDA2020.geojson"
+geojson_file = "datasets/RoadCrashes_GDA2020.geojson"
 
 with open(geojson_file, 'r') as file:
     geojson_data = json.load(file)
