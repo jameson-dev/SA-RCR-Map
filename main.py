@@ -67,7 +67,7 @@ for feature in geojson_data['features']:
 
 # Save GeoJSON map to HTML file
 print("Saving generated HTML map")
-map_file = 'rcr_interactive_map.html'
+map_file = 'index.html'
 
 geojson_map.save(map_file)
 print(f"Map generated: {map_file}")
