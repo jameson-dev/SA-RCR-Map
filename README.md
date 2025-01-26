@@ -6,6 +6,12 @@ The map visualizes road crash incidents, categorized by severity, including data
 
 The dataset used is provided by Data SA
 
+## Screenshot
+![rcr-map-full1](https://github.com/user-attachments/assets/5cb865e3-d068-4b9c-a092-87a6870cba55) ![rcr-map-marker1](https://github.com/user-attachments/assets/c80c1d94-da99-4eb4-b689-022603dce703)
+
+
+
+
 ## Features
 
 - **Interactive Map**: View crash data on a zoomable and pannable map.
