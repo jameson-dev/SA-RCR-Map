@@ -1,14 +1,53 @@
 import json
+import time
+
 import folium
+import htmlmin
+from geopandas import gpd
+from shapely.geometry import Point
 from folium.plugins import MarkerCluster
 
 # Specify GeoJSON file
-geojson_file = "datasets/RoadCrashes_GDA2020.geojson"
+rcr_geojson_file = "datasets/RoadCrashes_GDA2020.geojson"
+suburbs_geojson_file = "datasets/Suburbs_GDA2020.geojson"
 
-# Read data from file
-print(f"Collecting data from dataset: {geojson_file}")
-with open(geojson_file, 'r') as file:
+# Read suburbs data as GeoDataFrame
+print(f"Collecting suburbs data from dataset: {suburbs_geojson_file}")
+suburbs_gdf = gpd.read_file(suburbs_geojson_file)
+
+# Simplify geometry (Reduce HTML file size)
+print("Simplifying Suburbs GeoJSON")
+suburbs_gdf['geometry'] = suburbs_gdf['geometry'].simplify(tolerance=0.001)
+
+suburbs_gdf.to_file('datasets/simplified_suburbs.geojson', driver='GeoJSON')
+
+suburbs_geojson_file = "datasets/simplified_suburbs.geojson"
+
+# Read road crash data
+print(f"Collecting road crash data from dataset: {rcr_geojson_file}")
+with open(rcr_geojson_file, 'r') as file:
     geojson_data = json.load(file)
+
+# Convert road crash data to GeoDataFrame
+print("Converting road crash data to GeoDataFrame")
+crashes = []
+for feature in geojson_data['features']:
+    coords = feature['geometry']['coordinates']
+    crashes.append({
+        "geometry": Point(coords),
+        "TOTAL_CRASHES": feature['properties']['TOTAL_CRASHES']
+    })
+
+# Collect GeoDataFrame for crashes using CRS data (Coordinate Reference System) for lat/long
+crash_gdf = gpd.GeoDataFrame(crashes, crs="EPSG:4326")
+
+# Spatial join to map crashes to suburbs
+print("Performing spatial join")
+crash_to_suburb = gpd.sjoin(crash_gdf, suburbs_gdf, how="left", predicate="intersects")
+
+# Aggregate crash counts by suburb
+print("Aggregating crash counts by suburb")
+suburb_crash_data = crash_to_suburb.groupby("suburb")["TOTAL_CRASHES"].sum().to_dict()
 
 # Set map center coordinates
 map_center = [-30.5344, 135.6300]
@@ -16,12 +55,16 @@ print(f"Setting map (center) location to {map_center[0]}, {map_center[1]}")
 
 # Generate map
 print("Generating map")
-geojson_map = folium.Map(location=map_center, zoom_start=6)
+geojson_map = folium.Map(
+    location=map_center,
+    zoom_start=6
+    )
 
 # Create MarkerCluster object
 marker_cluster = MarkerCluster().add_to(geojson_map)
 
 # Add markers to cluster
+print("Adding markers to map clusters")
 for feature in geojson_data['features']:
     coords = feature['geometry']['coordinates']
     properties = feature['properties']
@@ -64,11 +107,28 @@ for feature in geojson_data['features']:
         popup=folium.Popup(popup_content, max_width=400)
     ).add_to(marker_cluster)
 
+# Add choropleth layer
+print("Adding choropleth layer")
+folium.Choropleth(
+    geo_data=suburbs_geojson_file,
+    name='Choropleth',
+    data=list(suburb_crash_data.items()),
+    columns=['suburb', 'crash_count'],
+    key_on='feature.properties.suburb',
+    fill_color='YlOrRd',
+    fill_opacity=0.7,
+    line_opacity=0.2,
+    threshold_scale=[0, 5, 10, 25, 50, 80, 150, 300, 600, 800, 1000, 1500, 2000, max(suburb_crash_data.values())],
+    legend_name='Total Crashes by Suburb',
 
-# Save GeoJSON map to HTML file
-print("Saving generated HTML map")
+).add_to(geojson_map)
+
+# Add layer control
+print("Adding layer control to map")
+folium.LayerControl().add_to(geojson_map)
+
+# Save the map to an HTML file
 map_file = 'index.html'
-
+print(f"Saving generated HTML map to {map_file}")
 geojson_map.save(map_file)
 print(f"Map generated: {map_file}")
-
