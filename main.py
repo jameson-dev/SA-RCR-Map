@@ -61,7 +61,7 @@ geojson_map = folium.Map(
     )
 
 # Create MarkerCluster object
-marker_cluster = MarkerCluster().add_to(geojson_map)
+marker_cluster = MarkerCluster(name="Crash Sites").add_to(geojson_map)
 
 # Add markers to cluster
 print("Adding markers to map clusters")
