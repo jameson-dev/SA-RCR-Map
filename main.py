@@ -1,8 +1,5 @@
 import json
-import time
-
 import folium
-import htmlmin
 from geopandas import gpd
 from shapely.geometry import Point
 from folium.plugins import MarkerCluster
