@@ -1,4 +1,6 @@
 import json
+import os
+
 import folium
 from geopandas import gpd
 from shapely.geometry import Point
@@ -127,5 +129,7 @@ folium.LayerControl().add_to(geojson_map)
 # Save the map to an HTML file
 map_file = 'index.html'
 print(f"Saving generated HTML map to {map_file}")
+
 geojson_map.save(map_file)
-print(f"Map generated: {map_file}")
+file_size = os.path.getsize(map_file) / 1024  # Convert bytes to KB
+print(f"Map generated: {map_file} ({file_size:.2f} KB)")
