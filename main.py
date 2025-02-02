@@ -65,7 +65,7 @@ geojson_map = folium.Map(
 fatal_crashes = folium.FeatureGroup(name="Fatal Crashes", show=False)
 serious_inj = folium.FeatureGroup(name="Serious Injuries", show=False)
 minor_inj = folium.FeatureGroup(name="Minor Injuries", show=False)
-property_dmg = folium.FeatureGroup(name="Property Damage Only", show=False)
+property_dmg = folium.FeatureGroup(name="Property Damage", show=False)
 rear_end = folium.FeatureGroup(name="Rear End", show=False)
 hit_fixed_object = folium.FeatureGroup(name="Hit Fixed Object", show=False)
 side_swipe = folium.FeatureGroup(name="Side Swipe", show=False)
@@ -84,7 +84,7 @@ cty_other = folium.FeatureGroup(name="Other", show=False)
 fatal_cluster = MarkerCluster(name="Fatal Crashes", show=True).add_to(fatal_crashes)
 serious_cluster = MarkerCluster(name="Serious Injuries", show=True).add_to(serious_inj)
 minor_cluster = MarkerCluster(name="Minor Injuries", show=True).add_to(minor_inj)
-property_cluster = MarkerCluster(name="Property Damage Only", show=True).add_to(property_dmg)
+property_cluster = MarkerCluster(name="Property Damage", show=True).add_to(property_dmg)
 rear_end_cluster = MarkerCluster(name="Rear End", show=True).add_to(rear_end)
 hit_fixed_cluster = MarkerCluster(name="Hit Fixed Object", show=True).add_to(hit_fixed_object)
 side_swipe_cluster = MarkerCluster(name="Side Swipe", show=True).add_to(side_swipe)
@@ -152,10 +152,8 @@ for feature in geojson_data['features']:
     properties = feature['properties']
 
     popup_content = f"""
-    <h4><b>Details</b></h4>
-    <p><b>CRS Location:</b> {properties['UNIQUE_LOC']}</p>
     <h5><b>Crash Type</b></h5>
-    """ + "".join(f"<span><b>{name}:</b> {properties[key]} | </span>" for key, name in crash_types.items() if properties.get(key, 0) > 0)
+    """ + "".join(f"<span><b>{name}:</b> {properties[key]}<br></span>" for key, name in crash_types.items() if properties.get(key, 0) > 0)
 
     # Add marker to the appropriate cluster
     for key, cluster in crash_clusters.items():
@@ -176,7 +174,7 @@ folium.Choropleth(
     fill_color='YlOrRd',
     fill_opacity=0.7,
     line_opacity=0.2,
-    threshold_scale=[0, 5, 10, 25, 50, 80, 150, 300, 600, 800, 1000, 1500, 2000, suburb_crash_data["TOTAL_CRASHES"].max()],
+    threshold_scale=[0, 10, 25, 50, 80, 150, 300, 600, 800, 1000, 1500, 2000, suburb_crash_data["TOTAL_CRASHES"].max()],
     legend_name='Total Crashes by Suburb',
 ).add_to(geojson_map)
 
