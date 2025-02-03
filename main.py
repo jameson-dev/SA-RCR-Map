@@ -39,10 +39,11 @@ for feature in geojson_data['features']:
     })
 
 # Collect GeoDataFrame for crashes using CRS data (Coordinate Reference System) for lat/long
+print("Storing GeoDataFrame data using CRS (Coordinate Reference System data for lat/long conversion")
 crash_gdf = gpd.GeoDataFrame(crashes, crs="EPSG:4326")
 
 # Spatial join to map crashes to suburbs
-print("Performing spatial join")
+print("Performing spatial join (Crashes to Suburbs)")
 crash_to_suburb = gpd.sjoin(crash_gdf, suburbs_gdf, how="left", predicate="intersects")
 
 # Aggregate crash counts by suburb
@@ -77,7 +78,7 @@ crash_types = {
     "CTY_HIT_ANIMAL": "Hit Animal",
     "CTY_HIT_OBJECT_ON_ROAD": "Hit Object on Road",
     "CTY_LEFT_ROAD_OC": "Left Road",
-    "CTY_OTHER": "Other"
+    "CTY_OTHER": "Other (unknown)"
 }
 
 crash_clusters = {}
@@ -95,26 +96,87 @@ geojson_markers = {
     "features": []
 }
 
-# Loop through crash data and save it as GeoJSON
+# Save markers to an external GeoJSON file
+
+output_file = "datasets/markers.geojson"
+print(f"Saving markers externally to {output_file}")
+with open(output_file, "w") as f:
+    json.dump(geojson_markers, f)
+
+cluster_data = {
+    "Fatal Crashes": [],
+    "Serious Injuries": [],
+    "Minor Injuries": [],
+    "Property Damage Only": [],
+    "Rear End": [],
+    "Hit Fixed Object": [],
+    "Side Swipe": [],
+    "Right Angle": [],
+    "Head On": [],
+    "Hit Pedestrian": [],
+    "Roll Over": [],
+    "Right Turn": [],
+    "Hit Parked Vehicle": [],
+    "Hit Animal": [],
+    "Hit Object on Road": [],
+    "Left Road": [],
+    "Other (unknown)": []
+}
+
+# Loop through crash data and assign markers to their respective clusters
+print("Assigning markers to clusters")
 for feature in geojson_data['features']:
     coords = feature['geometry']['coordinates']
     properties = feature['properties']
+    crash_types_found = []  # List to store all matching crash types
 
-    geojson_markers["features"].append({
-        "type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": coords
-        },
-        "properties": properties
-    })
+    # Iterate through each crash type
+    for key, name in crash_types.items():
+        value = properties.get(key)
+        if value and value > 0:
+            print(f"Found crash type {name} for feature with {key}: {value}")
+            crash_types_found.append(name)
 
-# Save markers to an external GeoJSON file
+    # If there are any matching crash types, add the feature to those clusters
+    if crash_types_found:
+        for crash_type in crash_types_found:
+            print(f"Feature with coordinates {coords} added to crash type {crash_type}")
+            cluster_data[crash_type].append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": coords
+                },
+                "properties": properties
+            })
+
+            # Also add the feature to geojson_markers
+            geojson_markers["features"].append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": coords
+                },
+                "properties": {
+                    **properties,
+                    "crash_type": crash_type  # Add the crash_type here
+                }
+            })
+    else:
+        print(f"Warning: No valid crash type found for feature with properties {properties}")
+
+
+# Save the markers to a file after collecting them
 output_file = "datasets/markers.geojson"
 with open(output_file, "w") as f:
     json.dump(geojson_markers, f)
 
 print(f"Markers saved externally to {output_file}")
+
+# Save cluster data to a JSON file
+cluster_file = "datasets/cluster_data.json"
+with open(cluster_file, "w") as f:
+    json.dump(cluster_data, f)
 
 # Add choropleth layer for suburb crash data
 print("Adding choropleth layer")
@@ -148,28 +210,29 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(response => response.json())
         .then(data => {
             let featureGroups = {
-                "Fatal Crashes": L.markerClusterGroup(),
-                "Serious Injuries": L.markerClusterGroup(),
-                "Minor Injuries": L.markerClusterGroup(),
-                "Property Damage": L.markerClusterGroup(),
-                "Rear End": L.markerClusterGroup(),
-                "Hit Fixed Object": L.markerClusterGroup(),
-                "Side Swipe": L.markerClusterGroup(),
-                "Right Angle": L.markerClusterGroup(),
-                "Head On": L.markerClusterGroup(),
-                "Hit Pedestrian": L.markerClusterGroup(),
-                "Roll Over": L.markerClusterGroup(),
-                "Right Turn": L.markerClusterGroup(),
-                "Hit Parked Vehicle": L.markerClusterGroup(),
-                "Hit Animal": L.markerClusterGroup(),
-                "Hit Object on Road": L.markerClusterGroup(),
-                "Left Road": L.markerClusterGroup(),
-                "Other (unknown)": L.markerClusterGroup()
+                "Fatal Crashes": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Serious Injuries": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Minor Injuries": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Property Damage Only": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Rear End": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Fixed Object": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Side Swipe": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Right Angle": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Head On": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Pedestrian": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Roll Over": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Right Turn": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Parked Vehicle": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Animal": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Object on Road": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Left Road": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Other (unknown)": L.markerClusterGroup({ maxClusterRadius: 50 })
             };
-
+            console.log("Feature Groups:", featureGroups);  // Log to verify all feature groups are present
+            
             L.geoJSON(data, {
                 pointToLayer: function(feature, latlng) {
-                    return L.marker(latlng); // Convert GeoJSON points to markers
+                    return L.marker(latlng);
                 },
                 onEachFeature: function(feature, layer) {
                     let popupContent = `<h5><b>Crash Type</b></h5>`;
@@ -177,76 +240,28 @@ document.addEventListener("DOMContentLoaded", function() {
                         popupContent += `<span><b>${key}:</b> ${value}<br></span>`;
                     }
                     layer.bindPopup(popupContent);
-
-                    // Use an array to collect all matching groups
-                    let assignedGroups = [];
-
-                    // Check each condition and add the marker to the corresponding group
-                    if (feature.properties["CSE_FAT"] > 0) {
-                        assignedGroups.push(featureGroups["Fatal Crashes"]);
+                
+                    // Assign the marker to the appropriate cluster
+                    let crashType = feature.properties.crash_type; // This assumes `crash_type` is defined
+                    if (featureGroups[crashType]) {
+                        featureGroups[crashType].addLayer(layer);
                     }
-                    if (feature.properties["CSE_SI"] > 0) {
-                        assignedGroups.push(featureGroups["Serious Injuries"]);
-                    }
-                    if (feature.properties["CSE_INJ"] > 0) {
-                        assignedGroups.push(featureGroups["Minor Injuries"]);
-                    }
-                    if (feature.properties["CSE_PDO"] > 0) {
-                        assignedGroups.push(featureGroups["Property Damage"]);
-                    }
-                    if (feature.properties["CTY_REAR_END"] > 0) {
-                        assignedGroups.push(featureGroups["Rear End"]);
-                    }
-                    if (feature.properties["CTY_HIT_FIXED_OBJECT"] > 0) {
-                        assignedGroups.push(featureGroups["Hit Fixed Object"]);
-                    }
-                    if (feature.properties["CTY_SIDE_SWIPE"] > 0) {
-                        assignedGroups.push(featureGroups["Side Swipe"]);
-                    }
-                    if (feature.properties["CTY_RIGHT_ANGLE"] > 0) {
-                        assignedGroups.push(featureGroups["Right Angle"]);
-                    }
-                    if (feature.properties["CTY_HEAD_ON"] > 0) {
-                        assignedGroups.push(featureGroups["Head On"]);
-                    }
-                    if (feature.properties["CTY_HIT_PEDESTRIAN"] > 0) {
-                        assignedGroups.push(featureGroups["Hit Pedestrian"]);
-                    }
-                    if (feature.properties["CTY_ROLL_OVER"] > 0) {
-                        assignedGroups.push(featureGroups["Roll Over"]);
-                    }
-                    if (feature.properties["CTY_RIGHT_TURN"] > 0) {
-                        assignedGroups.push(featureGroups["Right Turn"]);
-                    }
-                    if (feature.properties["CTY_HIT_PARKED_VEHICLE"] > 0) {
-                        assignedGroups.push(featureGroups["Hit Parked Vehicle"]);
-                    }
-                    if (feature.properties["CTY_HIT_ANIMAL"] > 0) {
-                        assignedGroups.push(featureGroups["Hit Animal"]);
-                    }
-                    if (feature.properties["CTY_HIT_OBJECT_ON_ROAD"] > 0) {
-                        assignedGroups.push(featureGroups["Hit Object on Road"]);
-                    }
-                    if (feature.properties["CTY_LEFT_ROAD_OC"] > 0) {
-                        assignedGroups.push(featureGroups["Left Road"]);
-                    }
-                    if (feature.properties["CTY_OTHER"] > 0) {
-                        assignedGroups.push(featureGroups["Other (unknown)"]);
-                    }
-
-                    // Add the marker to all assigned groups
-                    assignedGroups.forEach(group => {
-                        group.addLayer(layer);
-                    });
                 }
             });
+            
+            // Add all feature groups to the map
+            for (let groupName in featureGroups) {
+                map.addLayer(featureGroups[groupName]);
+            }
 
             // Add the feature groups to the layer control
             let layerControl = L.control.layers(null, featureGroups, { collapsed: true }).addTo(map);
+
         })
         .catch(error => console.error("Error loading markers:", error));
 });
 </script>
+
 """
 
 # Append the script to the HTML file
