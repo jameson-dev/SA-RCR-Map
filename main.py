@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import folium
 from geopandas import gpd
@@ -13,8 +14,6 @@ suburbs_geojson_file = "datasets/Suburbs_GDA2020.geojson"
 # Read suburbs data as GeoDataFrame
 print(f"Collecting suburbs data from dataset: {suburbs_geojson_file}")
 suburbs_gdf = gpd.read_file(suburbs_geojson_file)
-
-
 
 # Simplify geometry (Reduce HTML file size)
 print("Simplifying Suburbs GeoJSON")
@@ -40,10 +39,11 @@ for feature in geojson_data['features']:
     })
 
 # Collect GeoDataFrame for crashes using CRS data (Coordinate Reference System) for lat/long
+print("Storing GeoDataFrame data using CRS (Coordinate Reference System data for lat/long conversion")
 crash_gdf = gpd.GeoDataFrame(crashes, crs="EPSG:4326")
 
 # Spatial join to map crashes to suburbs
-print("Performing spatial join")
+print("Performing spatial join (Crashes to Suburbs)")
 crash_to_suburb = gpd.sjoin(crash_gdf, suburbs_gdf, how="left", predicate="intersects")
 
 # Aggregate crash counts by suburb
@@ -60,62 +60,6 @@ geojson_map = folium.Map(
     location=map_center,
     zoom_start=6
 )
-
-# Create FeatureGroups for filtering
-fatal_crashes = folium.FeatureGroup(name="Fatal Crashes", show=False)
-serious_inj = folium.FeatureGroup(name="Serious Injuries", show=False)
-minor_inj = folium.FeatureGroup(name="Minor Injuries", show=False)
-property_dmg = folium.FeatureGroup(name="Property Damage", show=False)
-rear_end = folium.FeatureGroup(name="Rear End", show=False)
-hit_fixed_object = folium.FeatureGroup(name="Hit Fixed Object", show=False)
-side_swipe = folium.FeatureGroup(name="Side Swipe", show=False)
-right_angle = folium.FeatureGroup(name="Right Angle", show=False)
-head_on = folium.FeatureGroup(name="Head On", show=False)
-hit_pedestrian = folium.FeatureGroup(name="Hit Pedestrian", show=False)
-roll_over = folium.FeatureGroup(name="Roll Over", show=False)
-right_turn = folium.FeatureGroup(name="Right Turn", show=False)
-hit_parked_veh = folium.FeatureGroup(name="Hit Parked Vehicle", show=False)
-hit_animal = folium.FeatureGroup(name="Hit Animal", show=False)
-hit_object_on_road = folium.FeatureGroup(name="Hit Object on Road", show=False)
-left_road = folium.FeatureGroup(name="Left Road", show=False)
-cty_other = folium.FeatureGroup(name="Other", show=False)
-
-# Define Feature Groups with Clustering
-fatal_cluster = MarkerCluster(name="Fatal Crashes", show=True).add_to(fatal_crashes)
-serious_cluster = MarkerCluster(name="Serious Injuries", show=True).add_to(serious_inj)
-minor_cluster = MarkerCluster(name="Minor Injuries", show=True).add_to(minor_inj)
-property_cluster = MarkerCluster(name="Property Damage", show=True).add_to(property_dmg)
-rear_end_cluster = MarkerCluster(name="Rear End", show=True).add_to(rear_end)
-hit_fixed_cluster = MarkerCluster(name="Hit Fixed Object", show=True).add_to(hit_fixed_object)
-side_swipe_cluster = MarkerCluster(name="Side Swipe", show=True).add_to(side_swipe)
-right_angle_cluster = MarkerCluster(name="Right Angle", show=True).add_to(right_angle)
-head_on_cluster = MarkerCluster(name="Head On", show=True).add_to(head_on)
-hit_pedestrian_cluster = MarkerCluster(name="Hit Pedestrian", show=True).add_to(hit_pedestrian)
-roll_over_cluster = MarkerCluster(name="Roll Over", show=True).add_to(roll_over)
-right_turn_cluster = MarkerCluster(name="Right Turn", show=True).add_to(right_turn)
-hit_parked_veh_cluster = MarkerCluster(name="Hit Parked Vehicle", show=True).add_to(hit_parked_veh)
-hit_animal_cluster = MarkerCluster(name="Hit Animal", show=True).add_to(hit_animal)
-hit_object_on_road_cluster = MarkerCluster(name="Hit Object on Road", show=True).add_to(hit_object_on_road)
-left_road_cluster = MarkerCluster(name="Left Road", show=True).add_to(left_road)
-cty_other_cluster = MarkerCluster(name="Other", show=True).add_to(cty_other)
-
-# Add clusters to the map
-geojson_map.add_child(fatal_crashes)
-geojson_map.add_child(serious_inj)
-geojson_map.add_child(minor_inj)
-geojson_map.add_child(rear_end)
-geojson_map.add_child(hit_fixed_object)
-geojson_map.add_child(side_swipe)
-geojson_map.add_child(right_angle)
-geojson_map.add_child(head_on)
-geojson_map.add_child(hit_pedestrian)
-geojson_map.add_child(roll_over)
-geojson_map.add_child(right_turn)
-geojson_map.add_child(hit_parked_veh)
-geojson_map.add_child(hit_animal)
-geojson_map.add_child(hit_object_on_road)
-geojson_map.add_child(left_road)
-geojson_map.add_child(cty_other)
 
 crash_types = {
     "CSE_FAT": "Fatal Crashes",
@@ -134,7 +78,7 @@ crash_types = {
     "CTY_HIT_ANIMAL": "Hit Animal",
     "CTY_HIT_OBJECT_ON_ROAD": "Hit Object on Road",
     "CTY_LEFT_ROAD_OC": "Left Road",
-    "CTY_OTHER": "Other"
+    "CTY_OTHER": "Other (unknown)"
 }
 
 crash_clusters = {}
@@ -145,23 +89,94 @@ for key, name in crash_types.items():
     geojson_map.add_child(feature_group)
     crash_clusters[key] = cluster
 
-
 # Add markers for specific crash types
+# Create an empty GeoJSON structure
+geojson_markers = {
+    "type": "FeatureCollection",
+    "features": []
+}
+
+# Save markers to an external GeoJSON file
+
+output_file = "datasets/markers.geojson"
+print(f"Saving markers externally to {output_file}")
+with open(output_file, "w") as f:
+    json.dump(geojson_markers, f)
+
+cluster_data = {
+    "Fatal Crashes": [],
+    "Serious Injuries": [],
+    "Minor Injuries": [],
+    "Property Damage Only": [],
+    "Rear End": [],
+    "Hit Fixed Object": [],
+    "Side Swipe": [],
+    "Right Angle": [],
+    "Head On": [],
+    "Hit Pedestrian": [],
+    "Roll Over": [],
+    "Right Turn": [],
+    "Hit Parked Vehicle": [],
+    "Hit Animal": [],
+    "Hit Object on Road": [],
+    "Left Road": [],
+    "Other (unknown)": []
+}
+
+# Loop through crash data and assign markers to their respective clusters
+print("Assigning markers to clusters")
 for feature in geojson_data['features']:
     coords = feature['geometry']['coordinates']
     properties = feature['properties']
+    crash_types_found = []  # List to store all matching crash types
 
-    popup_content = f"""
-    <h5><b>Crash Type</b></h5>
-    """ + "".join(f"<span><b>{name}:</b> {properties[key]}<br></span>" for key, name in crash_types.items() if properties.get(key, 0) > 0)
+    # Iterate through each crash type
+    for key, name in crash_types.items():
+        value = properties.get(key)
+        if value and value > 0:
+            print(f"Found crash type {name} for feature with {key}: {value}")
+            crash_types_found.append(name)
 
-    # Add marker to the appropriate cluster
-    for key, cluster in crash_clusters.items():
-        if properties.get(key):
-            folium.Marker(
-                location=[coords[1], coords[0]],
-                popup=folium.Popup(popup_content, max_width=400)
-            ).add_to(cluster)
+    # If there are any matching crash types, add the feature to those clusters
+    if crash_types_found:
+        for crash_type in crash_types_found:
+            print(f"Feature with coordinates {coords} added to crash type {crash_type}")
+            cluster_data[crash_type].append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": coords
+                },
+                "properties": properties
+            })
+
+            # Also add the feature to geojson_markers
+            geojson_markers["features"].append({
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": coords
+                },
+                "properties": {
+                    **properties,
+                    "crash_type": crash_type  # Add the crash_type here
+                }
+            })
+    else:
+        print(f"Warning: No valid crash type found for feature with properties {properties}")
+
+
+# Save the markers to a file after collecting them
+output_file = "datasets/markers.geojson"
+with open(output_file, "w") as f:
+    json.dump(geojson_markers, f)
+
+print(f"Markers saved externally to {output_file}")
+
+# Save cluster data to a JSON file
+cluster_file = "datasets/cluster_data.json"
+with open(cluster_file, "w") as f:
+    json.dump(cluster_data, f)
 
 # Add choropleth layer for suburb crash data
 print("Adding choropleth layer")
@@ -178,10 +193,6 @@ folium.Choropleth(
     legend_name='Total Crashes by Suburb',
 ).add_to(geojson_map)
 
-# Add layer control
-print("Adding layer control to map")
-folium.LayerControl().add_to(geojson_map)
-
 # Save the map to an HTML file
 map_file = 'index.html'
 print(f"Saving generated HTML map to {map_file}")
@@ -190,3 +201,94 @@ geojson_map.save(map_file)
 
 file_size = os.path.getsize(map_file) / 1024  # Convert bytes to KB
 print(f"Map generated: {map_file} ({file_size:.2f} KB)")
+
+# JavaScript code to load markers externally
+external_marker_script = """
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    fetch("datasets/markers.geojson")
+        .then(response => response.json())
+        .then(data => {
+            let featureGroups = {
+                "Fatal Crashes": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Serious Injuries": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Minor Injuries": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Property Damage Only": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Rear End": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Fixed Object": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Side Swipe": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Right Angle": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Head On": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Pedestrian": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Roll Over": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Right Turn": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Parked Vehicle": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Animal": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Hit Object on Road": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Left Road": L.markerClusterGroup({ maxClusterRadius: 50 }),
+                "Other (unknown)": L.markerClusterGroup({ maxClusterRadius: 50 })
+            };
+            console.log("Feature Groups:", featureGroups);  // Log to verify all feature groups are present
+            
+            L.geoJSON(data, {
+                pointToLayer: function(feature, latlng) {
+                    return L.marker(latlng);
+                },
+                onEachFeature: function(feature, layer) {
+                    let popupContent = `<h5><b>Crash Type</b></h5>`;
+                    for (const [key, value] of Object.entries(feature.properties)) {
+                        popupContent += `<span><b>${key}:</b> ${value}<br></span>`;
+                    }
+                    layer.bindPopup(popupContent);
+                
+                    // Assign the marker to the appropriate cluster
+                    let crashType = feature.properties.crash_type; // This assumes `crash_type` is defined
+                    if (featureGroups[crashType]) {
+                        featureGroups[crashType].addLayer(layer);
+                    }
+                }
+            });
+            
+            // Add all feature groups to the map
+            for (let groupName in featureGroups) {
+                map.addLayer(featureGroups[groupName]);
+            }
+
+            // Add the feature groups to the layer control
+            let layerControl = L.control.layers(null, featureGroups, { collapsed: true }).addTo(map);
+
+        })
+        .catch(error => console.error("Error loading markers:", error));
+});
+</script>
+
+"""
+
+# Append the script to the HTML file
+with open("index.html", "a") as f:
+    f.write(external_marker_script)
+
+print("Added external marker script to index.html")
+
+# Simplify map var name
+# Read the generated index.html file
+with open("index.html", "r", encoding="utf-8") as f:
+    html_content = f.read()
+
+# Find the dynamically generated map variable
+map_var_match = re.search(r"var (map_[a-f0-9]+) = L\.map\(", html_content)
+
+if map_var_match:
+    old_map_var = map_var_match.group(1)  # Extract the generated map variable name
+    print(f"Replacing {old_map_var} with 'map'...")
+
+    # Replace all occurrences of the generated name with 'map'
+    html_content = html_content.replace(old_map_var, "map")
+
+    # Write the updated content back to index.html
+    with open("index.html", "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    print("Updated index.html to use 'map' as the variable name.")
+else:
+    print("Map variable not found. No changes made.")
